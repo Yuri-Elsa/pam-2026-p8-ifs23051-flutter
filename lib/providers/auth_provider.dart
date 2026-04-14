@@ -22,11 +22,17 @@ class AuthProvider extends ChangeNotifier {
   String? _refreshToken;
   String _errorMessage = '';
 
+  // Flag untuk mencegah redirect saat sedang update profil
+  bool _isUpdating = false;
+
   // ── Getters ──────────────────────────────────
   AuthStatus get status        => _status;
   UserModel? get user          => _user;
   String? get authToken        => _authToken;
-  bool get isAuthenticated     => _authToken != null && _status == AuthStatus.authenticated;
+  // Selama _isUpdating, tetap anggap authenticated agar router tidak redirect
+  bool get isAuthenticated     => _authToken != null &&
+      (_status == AuthStatus.authenticated ||
+          (_isUpdating && _status == AuthStatus.loading));
   String get errorMessage      => _errorMessage;
 
   // ── Init: cek token tersimpan ─────────────────
@@ -93,9 +99,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ── Load Profile ─────────────────────────────
-  Future<void> loadProfile() async {
+  // [silent] = true → tidak ubah status ke loading (agar tidak trigger redirect)
+  Future<void> loadProfile({bool silent = false}) async {
     if (_authToken == null) return;
-    _setStatus(AuthStatus.loading);
+
+    if (!silent) {
+      _setStatus(AuthStatus.loading);
+    }
+
     final result = await _repository.getMe(authToken: _authToken!);
     if (result.success && result.data != null) {
       _user = result.data;
@@ -116,15 +127,27 @@ class AuthProvider extends ChangeNotifier {
     required String username,
   }) async {
     if (_authToken == null) return false;
+
+    _isUpdating = true;
     _setStatus(AuthStatus.loading);
+
     final result = await _repository.updateMe(
       authToken: _authToken!, name: name, username: username,
     );
+
     if (result.success) {
-      await loadProfile();
+      // Refresh data user secara silent tanpa ubah status ke loading lagi
+      final profileResult = await _repository.getMe(authToken: _authToken!);
+      if (profileResult.success && profileResult.data != null) {
+        _user = profileResult.data;
+      }
+      _isUpdating = false;
+      _setStatus(AuthStatus.authenticated);
       return true;
     }
+
     _errorMessage = result.message;
+    _isUpdating = false;
     _setStatus(AuthStatus.authenticated);
     return false;
   }
@@ -135,12 +158,18 @@ class AuthProvider extends ChangeNotifier {
     required String newPassword,
   }) async {
     if (_authToken == null) return false;
+
+    _isUpdating = true;
     _setStatus(AuthStatus.loading);
+
     final result = await _repository.updatePassword(
       authToken: _authToken!,
       currentPassword: currentPassword,
       newPassword: newPassword,
     );
+
+    _isUpdating = false;
+
     if (result.success) {
       _setStatus(AuthStatus.authenticated);
       return true;
@@ -151,25 +180,36 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ── Update Photo ──────────────────────────────
-  // Mendukung Web (imageBytes) dan Mobile (imageFile)
   Future<bool> updatePhoto({
     File? imageFile,
     Uint8List? imageBytes,
     String imageFilename = 'photo.jpg',
   }) async {
     if (_authToken == null) return false;
+
+    _isUpdating = true;
     _setStatus(AuthStatus.loading);
+
     final result = await _repository.updatePhoto(
       authToken: _authToken!,
       imageFile: imageFile,
       imageBytes: imageBytes,
       imageFilename: imageFilename,
     );
+
     if (result.success) {
-      await loadProfile();
+      // Refresh data user secara silent
+      final profileResult = await _repository.getMe(authToken: _authToken!);
+      if (profileResult.success && profileResult.data != null) {
+        _user = profileResult.data;
+      }
+      _isUpdating = false;
+      _setStatus(AuthStatus.authenticated);
       return true;
     }
+
     _errorMessage = result.message;
+    _isUpdating = false;
     _setStatus(AuthStatus.authenticated);
     return false;
   }

@@ -82,9 +82,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               flexibleSpace: FlexibleSpaceBar(
                 stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
                 titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-                title: Text(
-                  'Halo, ${user?.name ?? '—'} 👋',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                title: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Halo, ${user?.name ?? '—'} 👋',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'Kelola todo-mu hari ini',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 11,
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ],
                 ),
                 background: Container(
                   decoration: BoxDecoration(
@@ -126,22 +144,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             shape: BoxShape.circle,
                             color: Colors.white.withOpacity(0.06),
                           ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Text(
-                              'Kelola todo-mu hari ini',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.85),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ],

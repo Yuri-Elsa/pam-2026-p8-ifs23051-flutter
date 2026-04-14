@@ -28,17 +28,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _profileLoading = false;
 
   // ── Change Password State ───────────
-  final _passFormKey    = GlobalKey<FormState>();
-  final _currPassCtrl   = TextEditingController();
-  final _newPassCtrl    = TextEditingController();
-  final _confPassCtrl   = TextEditingController();
-  bool _passLoading     = false;
-  bool _showCurrPass    = false;
-  bool _showNewPass     = false;
-  bool _showConfPass    = false;
+  final _passFormKey   = GlobalKey<FormState>();
+  final _currPassCtrl  = TextEditingController();
+  final _newPassCtrl   = TextEditingController();
+  final _confPassCtrl  = TextEditingController();
+  bool _passLoading    = false;
+  bool _showCurrPass   = false;
+  bool _showNewPass    = false;
+  bool _showConfPass   = false;
 
-  // ── Photo Preview ───────────────────
-  Uint8List? _previewBytes; // for local preview before upload
+  // ── Photo State ─────────────────────
+  // Preview bytes ditampilkan saat upload sedang berlangsung
+  Uint8List? _previewBytes;
+  bool _photoUploading = false;
+  // URL foto yang sudah dikonfirmasi dari server — dikelola di state lokal
+  // agar tidak bergantung pada setiap rebuild provider
+  String? _confirmedPhotoUrl;
+  // Cache-buster di-set SEKALI saat upload berhasil, bukan setiap build()
+  int? _cacheBuster;
 
   @override
   void initState() {
@@ -46,6 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = context.read<AuthProvider>().user;
     _nameCtrl = TextEditingController(text: user?.name ?? '');
     _userCtrl = TextEditingController(text: user?.username ?? '');
+    _confirmedPhotoUrl = user?.urlPhoto;
   }
 
   @override
@@ -56,6 +64,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _newPassCtrl.dispose();
     _confPassCtrl.dispose();
     super.dispose();
+  }
+
+  // Bangun ImageProvider berdasarkan state saat ini — dipanggil di build()
+  ImageProvider? _buildAvatarImage() {
+    // Prioritas 1: preview bytes lokal (saat upload berlangsung)
+    if (_previewBytes != null) {
+      return MemoryImage(_previewBytes!);
+    }
+    // Prioritas 2: URL yang sudah dikonfirmasi dari server
+    if (_confirmedPhotoUrl != null && _confirmedPhotoUrl!.isNotEmpty) {
+      // Cache-buster statis (hanya berubah saat upload berhasil)
+      final url = _cacheBuster != null
+          ? '$_confirmedPhotoUrl?t=$_cacheBuster'
+          : _confirmedPhotoUrl!;
+      return NetworkImage(url);
+    }
+    return null;
   }
 
   // ── Foto Profil ─────────────────────
@@ -69,15 +94,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       if (picked == null || !mounted) return;
 
-      // Read bytes works for both web and mobile
       final bytes = await picked.readAsBytes();
 
-      // Show local preview immediately
-      setState(() => _previewBytes = bytes);
+      // Tampilkan preview lokal segera
+      setState(() {
+        _previewBytes   = bytes;
+        _photoUploading = true;
+      });
 
-      // Upload
       final success = await context.read<AuthProvider>().updatePhoto(
-        // On web, pass only bytes. On mobile, pass the File too.
         imageFile:     kIsWeb ? null : File(picked.path),
         imageBytes:    bytes,
         imageFilename: picked.name.isNotEmpty ? picked.name : 'photo.jpg',
@@ -86,18 +111,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       if (success) {
-        setState(() => _previewBytes = null); // clear preview; network image will refresh
+        // Ambil URL terbaru dari provider setelah upload berhasil
+        final newUrl = context.read<AuthProvider>().user?.urlPhoto;
+        setState(() {
+          _confirmedPhotoUrl = newUrl;
+          // Set cache-buster sekali saja — tidak akan berubah sampai upload berikutnya
+          _cacheBuster       = DateTime.now().millisecondsSinceEpoch;
+          _previewBytes      = null;
+          _photoUploading    = false;
+        });
         showAppSnackBar(context,
             message: 'Foto profil berhasil diperbarui!',
             type: SnackBarType.success);
       } else {
-        setState(() => _previewBytes = null);
+        // Gagal — buang preview, kembali ke foto lama
+        setState(() {
+          _previewBytes   = null;
+          _photoUploading = false;
+        });
         showAppSnackBar(context,
             message: context.read<AuthProvider>().errorMessage,
             type: SnackBarType.error);
       }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _previewBytes   = null;
+          _photoUploading = false;
+        });
         showAppSnackBar(context,
             message: 'Gagal memilih foto: $e',
             type: SnackBarType.error);
@@ -107,12 +148,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickPhoto() async {
     if (kIsWeb) {
-      // Web hanya mendukung galeri
       await _pickAndUploadPhoto(ImageSource.gallery);
       return;
     }
-
-    // Mobile: pilihan sumber
     await showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -258,6 +296,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return const Scaffold(body: LoadingWidget());
     }
 
+    final avatarImage = _buildAvatarImage();
+
     return Scaffold(
       appBar: TopAppBarWidget(
         title: 'Profil Saya',
@@ -279,10 +319,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               children: [
                 GestureDetector(
-                  onTap: _pickPhoto,
+                  onTap: _photoUploading ? null : _pickPhoto,
                   child: Stack(
                     children: [
-                      // Avatar with local preview or network image
                       Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
@@ -297,12 +336,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: CircleAvatar(
                           radius: 56,
                           backgroundColor: colorScheme.primaryContainer,
-                          backgroundImage: _previewBytes != null
-                              ? MemoryImage(_previewBytes!) as ImageProvider
-                              : (user?.urlPhoto != null
-                              ? NetworkImage(user!.urlPhoto!)
-                              : null),
-                          child: (_previewBytes == null && user?.urlPhoto == null)
+                          backgroundImage: avatarImage,
+                          child: avatarImage == null
                               ? Text(
                             (user?.name.isNotEmpty == true)
                                 ? user!.name[0].toUpperCase()
@@ -316,13 +351,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : null,
                         ),
                       ),
-                      // Loading overlay
-                      if (provider.status == AuthStatus.loading)
+                      // Loading overlay saat upload berlangsung
+                      if (_photoUploading)
                         Positioned.fill(
                           child: Container(
                             decoration: const BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.black26,
+                              color: Colors.black38,
                             ),
                             child: const Center(
                               child: CircularProgressIndicator(
@@ -333,20 +368,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                       // Edit badge
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: colorScheme.surface, width: 2.5),
+                      if (!_photoUploading)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: colorScheme.surface, width: 2.5),
+                            ),
+                            child: Icon(Icons.camera_alt_rounded,
+                                size: 15, color: colorScheme.onPrimary),
                           ),
-                          child: Icon(Icons.camera_alt_rounded,
-                              size: 15, color: colorScheme.onPrimary),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -366,7 +403,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  kIsWeb ? 'Ketuk untuk ganti foto' : 'Ketuk untuk ganti foto',
+                  'Ketuk untuk ganti foto',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: colorScheme.primary,
                   ),
@@ -392,8 +429,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       border: OutlineInputBorder(),
                     ),
                     textInputAction: TextInputAction.next,
-                    validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Nama tidak boleh kosong.' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Nama tidak boleh kosong.'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -404,8 +442,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       border: OutlineInputBorder(),
                     ),
                     textInputAction: TextInputAction.done,
-                    validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Username tidak boleh kosong.' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Username tidak boleh kosong.'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -413,12 +452,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: FilledButton.icon(
                       onPressed: _profileLoading ? null : _submitProfile,
                       icon: _profileLoading
-                          ? const SizedBox(width: 18, height: 18,
+                          ? const SizedBox(
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.save_outlined),
-                      label: Text(_profileLoading ? 'Menyimpan...' : 'Simpan Profil'),
+                      label: Text(_profileLoading
+                          ? 'Menyimpan...'
+                          : 'Simpan Profil'),
                       style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14)),
+                          padding:
+                          const EdgeInsets.symmetric(vertical: 14)),
                     ),
                   ),
                 ],
@@ -439,27 +483,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: _currPassCtrl,
                     label: 'Kata Sandi Saat Ini',
                     show: _showCurrPass,
-                    onToggle: () => setState(() => _showCurrPass = !_showCurrPass),
-                    validator: (v) =>
-                    (v == null || v.isEmpty) ? 'Kata sandi saat ini diperlukan.' : null,
+                    onToggle: () =>
+                        setState(() => _showCurrPass = !_showCurrPass),
+                    validator: (v) => (v == null || v.isEmpty)
+                        ? 'Kata sandi saat ini diperlukan.'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   _PasswordField(
                     controller: _newPassCtrl,
                     label: 'Kata Sandi Baru',
                     show: _showNewPass,
-                    onToggle: () => setState(() => _showNewPass = !_showNewPass),
-                    validator: (v) =>
-                    (v == null || v.trim().length < 6) ? 'Minimal 6 karakter.' : null,
+                    onToggle: () =>
+                        setState(() => _showNewPass = !_showNewPass),
+                    validator: (v) => (v == null || v.trim().length < 6)
+                        ? 'Minimal 6 karakter.'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   _PasswordField(
                     controller: _confPassCtrl,
                     label: 'Konfirmasi Kata Sandi Baru',
                     show: _showConfPass,
-                    onToggle: () => setState(() => _showConfPass = !_showConfPass),
-                    validator: (v) =>
-                    v != _newPassCtrl.text ? 'Kata sandi tidak cocok.' : null,
+                    onToggle: () =>
+                        setState(() => _showConfPass = !_showConfPass),
+                    validator: (v) => v != _newPassCtrl.text
+                        ? 'Kata sandi tidak cocok.'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -467,12 +517,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: FilledButton.icon(
                       onPressed: _passLoading ? null : _submitPassword,
                       icon: _passLoading
-                          ? const SizedBox(width: 18, height: 18,
+                          ? const SizedBox(
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.key_rounded),
-                      label: Text(_passLoading ? 'Mengubah...' : 'Ganti Kata Sandi'),
+                      label: Text(_passLoading
+                          ? 'Mengubah...'
+                          : 'Ganti Kata Sandi'),
                       style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14)),
+                          padding:
+                          const EdgeInsets.symmetric(vertical: 14)),
                     ),
                   ),
                 ],
@@ -487,11 +542,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icon(Icons.logout_rounded,
                 color: Theme.of(context).colorScheme.error),
             label: Text('Keluar dari Akun',
-                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                style:
+                TextStyle(color: Theme.of(context).colorScheme.error)),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
-              side: BorderSide(color: Theme.of(context).colorScheme.error.withOpacity(0.5)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              side: BorderSide(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .error
+                      .withOpacity(0.5)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 32),
