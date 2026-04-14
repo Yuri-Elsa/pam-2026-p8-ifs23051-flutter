@@ -3,6 +3,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/user_model.dart';
 import '../data/services/auth_repository.dart';
@@ -93,6 +95,11 @@ class AuthProvider extends ChangeNotifier {
     if (_authToken != null) {
       await _repository.logout(authToken: _authToken!);
     }
+
+    // Bersihkan semua image cache (in-memory + disk) saat logout
+    // agar foto profil user lain tidak ter-cache
+    await _clearImageCache();
+
     await _clearTokens();
     _user = null;
     _setStatus(AuthStatus.unauthenticated);
@@ -198,7 +205,10 @@ class AuthProvider extends ChangeNotifier {
     );
 
     if (result.success) {
-      // Refresh data user secara silent
+      // Bersihkan cache foto lama sebelum fetch URL baru dari server
+      await _evictOldPhotoCache();
+
+      // Refresh data user — URL foto sudah berubah di backend (UUID baru)
       final profileResult = await _repository.getMe(authToken: _authToken!);
       if (profileResult.success && profileResult.data != null) {
         _user = profileResult.data;
@@ -235,7 +245,40 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
-  // ── Helpers ───────────────────────────────────
+  // ── Image Cache Helpers ───────────────────────
+
+  /// Evict hanya cache foto profil yang sedang aktif (sebelum URL-nya berubah).
+  Future<void> _evictOldPhotoCache() async {
+    final oldUrl = _user?.urlPhoto;
+    if (oldUrl != null && oldUrl.isNotEmpty) {
+      // Hapus dari in-memory cache Flutter
+      imageCache.evict(NetworkImage(oldUrl));
+      imageCache.clearLiveImages();
+
+      // Hapus dari disk cache (flutter_cache_manager)
+      try {
+        await DefaultCacheManager().removeFile(oldUrl);
+      } catch (_) {
+        // Abaikan error jika file tidak ada di cache
+      }
+    }
+  }
+
+  /// Bersihkan SEMUA image cache saat logout.
+  Future<void> _clearImageCache() async {
+    // Clear in-memory cache
+    imageCache.clear();
+    imageCache.clearLiveImages();
+
+    // Clear disk cache dari flutter_cache_manager
+    try {
+      await DefaultCacheManager().emptyCache();
+    } catch (_) {
+      // Abaikan error
+    }
+  }
+
+  // ── Token Storage Helpers ─────────────────────
   Future<void> _saveTokens({
     required String authToken,
     required String refreshToken,

@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -39,9 +40,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // ── Photo State ─────────────────────
   bool _photoUploading = false;
-  // Key ini diganti setiap upload berhasil — memaksa CircleAvatar
-  // rebuild dari nol sehingga NetworkImage fetch ulang dari backend
-  Key _avatarKey = UniqueKey();
 
   @override
   void initState() {
@@ -84,18 +82,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       if (success) {
-        // Evict SEBELUM setState — urutan ini krusial.
-        // Jika setState dipanggil dulu, Flutter rebuild dengan cache lama.
-        // Evict dulu → setState → rebuild → Flutter fetch fresh dari backend.
-        final url = context.read<AuthProvider>().user?.urlPhoto;
-        if (url != null && url.isNotEmpty) {
-          imageCache.evict(NetworkImage(url));
-          imageCache.clearLiveImages();
-        }
-        setState(() {
-          _photoUploading = false;
-          _avatarKey = UniqueKey(); // key baru → CircleAvatar rebuild total
-        });
+        // AuthProvider sudah handle evict cache dan fetch URL baru dari server.
+        // Cukup setState untuk rebuild widget dengan URL baru dari provider.
+        setState(() => _photoUploading = false);
         showAppSnackBar(context,
             message: 'Foto profil berhasil diperbarui!',
             type: SnackBarType.success);
@@ -265,12 +254,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return const Scaffold(body: LoadingWidget());
     }
 
-    // Ambil URL langsung dari provider — konsisten dengan cara cover todo
-    // dibaca dari provider.selectedTodo.urlCover
     final photoUrl = user?.urlPhoto;
-    final avatarImage = (photoUrl != null && photoUrl.isNotEmpty)
-        ? NetworkImage(photoUrl)
-        : null;
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
 
     return Scaffold(
       appBar: TopAppBarWidget(
@@ -307,13 +292,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
-                        child: CircleAvatar(
-                          key: _avatarKey,
+                        // Gunakan CachedNetworkImage dengan key dari URL itu sendiri.
+                        // Backend sudah menggunakan UUID baru setiap upload, jadi
+                        // URL yang baru = foto yang baru. ValueKey(photoUrl) memaksa
+                        // Flutter rebuild widget ini saat URL berubah.
+                        child: hasPhoto
+                            ? CircleAvatar(
+                          key: ValueKey(photoUrl),
                           radius: 56,
                           backgroundColor: colorScheme.primaryContainer,
-                          backgroundImage: avatarImage,
-                          child: avatarImage == null
-                              ? Text(
+                          child: ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: photoUrl,
+                              width: 112,
+                              height: 112,
+                              fit: BoxFit.cover,
+                              // useOldImageOnUrlChange: false → saat URL berubah,
+                              // langsung tampilkan placeholder, bukan foto lama
+                              useOldImageOnUrlChange: false,
+                              placeholder: (_, __) => Container(
+                                width: 112,
+                                height: 112,
+                                color: colorScheme.primaryContainer,
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (_, __, ___) => Container(
+                                width: 112,
+                                height: 112,
+                                color: colorScheme.primaryContainer,
+                                child: Center(
+                                  child: Text(
+                                    (user?.name.isNotEmpty == true)
+                                        ? user!.name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      fontSize: 38,
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                            : CircleAvatar(
+                          radius: 56,
+                          backgroundColor: colorScheme.primaryContainer,
+                          child: Text(
                             (user?.name.isNotEmpty == true)
                                 ? user!.name[0].toUpperCase()
                                 : '?',
@@ -322,8 +353,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: colorScheme.primary,
                               fontWeight: FontWeight.bold,
                             ),
-                          )
-                              : null,
+                          ),
                         ),
                       ),
                       if (_photoUploading)
