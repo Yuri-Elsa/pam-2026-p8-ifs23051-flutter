@@ -76,6 +76,8 @@ class TodoProvider extends ChangeNotifier {
 
     if (result.success && result.data != null) {
       _todos = result.data!;
+      // FIX: hanya lanjut fetch jika data yang diterima sama dengan perPage
+      // Jika lebih kecil, berarti ini halaman terakhir
       _hasMore = result.data!.length >= _perPage;
       _setStatus(TodoStatus.success);
     } else {
@@ -86,7 +88,9 @@ class TodoProvider extends ChangeNotifier {
 
   // ── Load More (next page) ──────────────────────
   Future<void> loadMoreTodos({required String authToken}) async {
-    if (_isLoadingMore || !_hasMore) return;
+    // FIX: guard berlapis — jangan fetch jika sedang loading, tidak ada data
+    // baru, atau sedang loading halaman pertama
+    if (_isLoadingMore || !_hasMore || _status == TodoStatus.loading) return;
 
     _isLoadingMore = true;
     notifyListeners();
@@ -101,9 +105,23 @@ class TodoProvider extends ChangeNotifier {
     _isLoadingMore = false;
 
     if (result.success && result.data != null) {
-      _currentPage = nextPage;
-      _todos.addAll(result.data!);
-      _hasMore = result.data!.length >= _perPage;
+      final newItems = result.data!;
+
+      if (newItems.isEmpty) {
+        // FIX: server mengembalikan list kosong = tidak ada data lagi
+        _hasMore = false;
+      } else {
+        _currentPage = nextPage;
+        // FIX: hindari duplikat dengan mengecek ID sebelum menambahkan
+        final existingIds = _todos.map((t) => t.id).toSet();
+        final uniqueNewItems = newItems.where((t) => !existingIds.contains(t.id)).toList();
+        _todos.addAll(uniqueNewItems);
+        // FIX: jika item baru < perPage, berarti ini halaman terakhir
+        _hasMore = newItems.length >= _perPage;
+      }
+    } else {
+      // Gagal load more — jangan ubah _hasMore, biarkan user bisa retry
+      // dengan scroll lagi
     }
 
     notifyListeners();
@@ -139,15 +157,10 @@ class TodoProvider extends ChangeNotifier {
       description: description,
     );
     if (result.success) {
-      // Reload from page 1
-      final listResult = await _repository.getTodos(
-        authToken: authToken,
-        page: 1,
-        perPage: _currentPage * _perPage,
-      );
-      if (listResult.success && listResult.data != null) {
-        _todos = listResult.data!;
-      }
+      // FIX: selalu reload dari halaman 1 dengan jumlah item yang sudah
+      // di-load saat ini agar list tidak reset ke 10 item saja,
+      // tapi juga tidak melipatgandakan data
+      await _reloadCurrentList(authToken: authToken);
       _setStatus(TodoStatus.success);
       return true;
     }
@@ -173,25 +186,20 @@ class TodoProvider extends ChangeNotifier {
       isDone:      isDone,
     );
     if (result.success) {
-      final results = await Future.wait([
-        _repository.getTodoById(authToken: authToken, todoId: todoId),
-        _repository.getTodos(
-          authToken: authToken,
-          page: 1,
-          perPage: _currentPage * _perPage,
-        ),
-      ]);
-
-      final detailResult = results[0];
-      final listResult   = results[1];
-
+      // FIX: update item di list secara lokal terlebih dahulu (optimistic update)
+      // lalu fetch detail yang baru untuk selectedTodo
+      final detailResult = await _repository.getTodoById(
+        authToken: authToken,
+        todoId: todoId,
+      );
       if (detailResult.success && detailResult.data != null) {
-        _selectedTodo = detailResult.data as TodoModel;
+        _selectedTodo = detailResult.data;
+        // Update item di list lokal tanpa harus fetch ulang seluruh list
+        final idx = _todos.indexWhere((t) => t.id == todoId);
+        if (idx != -1) {
+          _todos[idx] = detailResult.data!;
+        }
       }
-      if (listResult.success && listResult.data != null) {
-        _todos = listResult.data as List<TodoModel>;
-      }
-
       _setStatus(TodoStatus.success);
       return true;
     }
@@ -217,25 +225,18 @@ class TodoProvider extends ChangeNotifier {
       imageFilename: imageFilename,
     );
     if (result.success) {
-      final results = await Future.wait([
-        _repository.getTodoById(authToken: authToken, todoId: todoId),
-        _repository.getTodos(
-          authToken: authToken,
-          page: 1,
-          perPage: _currentPage * _perPage,
-        ),
-      ]);
-
-      final detailResult = results[0];
-      final listResult   = results[1];
-
+      // FIX: sama seperti editTodo — update lokal saja, tidak perlu reload list
+      final detailResult = await _repository.getTodoById(
+        authToken: authToken,
+        todoId: todoId,
+      );
       if (detailResult.success && detailResult.data != null) {
-        _selectedTodo = detailResult.data as TodoModel;
+        _selectedTodo = detailResult.data;
+        final idx = _todos.indexWhere((t) => t.id == todoId);
+        if (idx != -1) {
+          _todos[idx] = detailResult.data!;
+        }
       }
-      if (listResult.success && listResult.data != null) {
-        _todos = listResult.data as List<TodoModel>;
-      }
-
       _setStatus(TodoStatus.success);
       return true;
     }
@@ -261,6 +262,28 @@ class TodoProvider extends ChangeNotifier {
     _errorMessage = result.message;
     _setStatus(TodoStatus.error);
     return false;
+  }
+
+  // ── Helper: reload list tanpa reset pagination ─
+  // Mengambil semua halaman yang sudah di-load sebelumnya dalam satu request
+  Future<void> _reloadCurrentList({required String authToken}) async {
+    // FIX: hitung total item yang saat ini sudah ada di list
+    // agar setelah add/edit, jumlah yang tampil tidak berubah drastis
+    final loadedCount = _todos.isEmpty ? _perPage : _todos.length;
+    // Ambil semua item yang sudah di-load dalam satu request (page 1, perPage = loadedCount + 1 untuk item baru)
+    final reloadResult = await _repository.getTodos(
+      authToken: authToken,
+      page: 1,
+      perPage: loadedCount + 1, // +1 untuk mengakomodasi item baru
+    );
+    if (reloadResult.success && reloadResult.data != null) {
+      _todos = reloadResult.data!;
+      // Jika data yang dikembalikan < perPage asli, tidak ada lagi data
+      _hasMore = reloadResult.data!.length >= _perPage;
+      // Reset current page agar loadMore berjalan dari titik yang benar
+      _currentPage = (reloadResult.data!.length / _perPage).ceil();
+      if (_currentPage < 1) _currentPage = 1;
+    }
   }
 
   // ── Filter ────────────────────────────────────

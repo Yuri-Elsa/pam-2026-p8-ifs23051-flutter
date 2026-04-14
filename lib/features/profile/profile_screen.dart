@@ -28,24 +28,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _profileLoading = false;
 
   // ── Change Password State ───────────
-  final _passFormKey   = GlobalKey<FormState>();
-  final _currPassCtrl  = TextEditingController();
-  final _newPassCtrl   = TextEditingController();
-  final _confPassCtrl  = TextEditingController();
-  bool _passLoading    = false;
-  bool _showCurrPass   = false;
-  bool _showNewPass    = false;
-  bool _showConfPass   = false;
+  final _passFormKey  = GlobalKey<FormState>();
+  final _currPassCtrl = TextEditingController();
+  final _newPassCtrl  = TextEditingController();
+  final _confPassCtrl = TextEditingController();
+  bool _passLoading   = false;
+  bool _showCurrPass  = false;
+  bool _showNewPass   = false;
+  bool _showConfPass  = false;
 
   // ── Photo State ─────────────────────
-  // Preview bytes ditampilkan saat upload sedang berlangsung
-  Uint8List? _previewBytes;
   bool _photoUploading = false;
-  // URL foto yang sudah dikonfirmasi dari server — dikelola di state lokal
-  // agar tidak bergantung pada setiap rebuild provider
-  String? _confirmedPhotoUrl;
-  // Cache-buster di-set SEKALI saat upload berhasil, bukan setiap build()
-  int? _cacheBuster;
+  // Key ini diganti setiap upload berhasil — memaksa CircleAvatar
+  // rebuild dari nol sehingga NetworkImage fetch ulang dari backend
+  Key _avatarKey = UniqueKey();
 
   @override
   void initState() {
@@ -53,7 +49,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = context.read<AuthProvider>().user;
     _nameCtrl = TextEditingController(text: user?.name ?? '');
     _userCtrl = TextEditingController(text: user?.username ?? '');
-    _confirmedPhotoUrl = user?.urlPhoto;
   }
 
   @override
@@ -64,23 +59,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _newPassCtrl.dispose();
     _confPassCtrl.dispose();
     super.dispose();
-  }
-
-  // Bangun ImageProvider berdasarkan state saat ini — dipanggil di build()
-  ImageProvider? _buildAvatarImage() {
-    // Prioritas 1: preview bytes lokal (saat upload berlangsung)
-    if (_previewBytes != null) {
-      return MemoryImage(_previewBytes!);
-    }
-    // Prioritas 2: URL yang sudah dikonfirmasi dari server
-    if (_confirmedPhotoUrl != null && _confirmedPhotoUrl!.isNotEmpty) {
-      // Cache-buster statis (hanya berubah saat upload berhasil)
-      final url = _cacheBuster != null
-          ? '$_confirmedPhotoUrl?t=$_cacheBuster'
-          : _confirmedPhotoUrl!;
-      return NetworkImage(url);
-    }
-    return null;
   }
 
   // ── Foto Profil ─────────────────────
@@ -95,12 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (picked == null || !mounted) return;
 
       final bytes = await picked.readAsBytes();
-
-      // Tampilkan preview lokal segera
-      setState(() {
-        _previewBytes   = bytes;
-        _photoUploading = true;
-      });
+      setState(() => _photoUploading = true);
 
       final success = await context.read<AuthProvider>().updatePhoto(
         imageFile:     kIsWeb ? null : File(picked.path),
@@ -111,34 +84,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       if (success) {
-        // Ambil URL terbaru dari provider setelah upload berhasil
-        final newUrl = context.read<AuthProvider>().user?.urlPhoto;
+        // Evict SEBELUM setState — urutan ini krusial.
+        // Jika setState dipanggil dulu, Flutter rebuild dengan cache lama.
+        // Evict dulu → setState → rebuild → Flutter fetch fresh dari backend.
+        final url = context.read<AuthProvider>().user?.urlPhoto;
+        if (url != null && url.isNotEmpty) {
+          imageCache.evict(NetworkImage(url));
+          imageCache.clearLiveImages();
+        }
         setState(() {
-          _confirmedPhotoUrl = newUrl;
-          // Set cache-buster sekali saja — tidak akan berubah sampai upload berikutnya
-          _cacheBuster       = DateTime.now().millisecondsSinceEpoch;
-          _previewBytes      = null;
-          _photoUploading    = false;
+          _photoUploading = false;
+          _avatarKey = UniqueKey(); // key baru → CircleAvatar rebuild total
         });
         showAppSnackBar(context,
             message: 'Foto profil berhasil diperbarui!',
             type: SnackBarType.success);
       } else {
-        // Gagal — buang preview, kembali ke foto lama
-        setState(() {
-          _previewBytes   = null;
-          _photoUploading = false;
-        });
+        setState(() => _photoUploading = false);
         showAppSnackBar(context,
             message: context.read<AuthProvider>().errorMessage,
             type: SnackBarType.error);
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _previewBytes   = null;
-          _photoUploading = false;
-        });
+        setState(() => _photoUploading = false);
         showAppSnackBar(context,
             message: 'Gagal memilih foto: $e',
             type: SnackBarType.error);
@@ -296,7 +265,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return const Scaffold(body: LoadingWidget());
     }
 
-    final avatarImage = _buildAvatarImage();
+    // Ambil URL langsung dari provider — konsisten dengan cara cover todo
+    // dibaca dari provider.selectedTodo.urlCover
+    final photoUrl = user?.urlPhoto;
+    final avatarImage = (photoUrl != null && photoUrl.isNotEmpty)
+        ? NetworkImage(photoUrl)
+        : null;
 
     return Scaffold(
       appBar: TopAppBarWidget(
@@ -334,6 +308,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                         child: CircleAvatar(
+                          key: _avatarKey,
                           radius: 56,
                           backgroundColor: colorScheme.primaryContainer,
                           backgroundImage: avatarImage,
@@ -351,7 +326,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : null,
                         ),
                       ),
-                      // Loading overlay saat upload berlangsung
                       if (_photoUploading)
                         Positioned.fill(
                           child: Container(
@@ -367,7 +341,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
-                      // Edit badge
                       if (!_photoUploading)
                         Positioned(
                           bottom: 0,
@@ -461,8 +434,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ? 'Menyimpan...'
                           : 'Simpan Profil'),
                       style: FilledButton.styleFrom(
-                          padding:
-                          const EdgeInsets.symmetric(vertical: 14)),
+                          padding: const EdgeInsets.symmetric(vertical: 14)),
                     ),
                   ),
                 ],
@@ -526,8 +498,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ? 'Mengubah...'
                           : 'Ganti Kata Sandi'),
                       style: FilledButton.styleFrom(
-                          padding:
-                          const EdgeInsets.symmetric(vertical: 14)),
+                          padding: const EdgeInsets.symmetric(vertical: 14)),
                     ),
                   ),
                 ],
@@ -542,15 +513,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icon(Icons.logout_rounded,
                 color: Theme.of(context).colorScheme.error),
             label: Text('Keluar dari Akun',
-                style:
-                TextStyle(color: Theme.of(context).colorScheme.error)),
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
               side: BorderSide(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .error
-                      .withOpacity(0.5)),
+                  color: Theme.of(context).colorScheme.error.withOpacity(0.5)),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
@@ -597,10 +564,13 @@ class _SectionCard extends StatelessWidget {
                   child: Icon(icon, color: colorScheme.primary, size: 20),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
