@@ -7,6 +7,7 @@ import '../data/models/todo_model.dart';
 import '../data/services/todo_repository.dart';
 
 enum TodoStatus { initial, loading, success, error }
+enum TodoFilter { all, done, pending }
 
 class TodoProvider extends ChangeNotifier {
   TodoProvider({TodoRepository? repository})
@@ -15,40 +16,97 @@ class TodoProvider extends ChangeNotifier {
   final TodoRepository _repository;
 
   // ── State ────────────────────────────────────
-  TodoStatus _status = TodoStatus.initial;
-  List<TodoModel> _todos = [];
+  TodoStatus _status      = TodoStatus.initial;
+  List<TodoModel> _todos  = [];
   TodoModel? _selectedTodo;
-  String _errorMessage = '';
-  String _searchQuery = '';
+  String _errorMessage    = '';
+  String _searchQuery     = '';
+  TodoFilter _filter      = TodoFilter.all;
+
+  // ── Pagination ────────────────────────────────
+  int _currentPage    = 1;
+  static const int _perPage = 10;
+  bool _hasMore       = true;
+  bool _isLoadingMore = false;
 
   // ── Getters ──────────────────────────────────
   TodoStatus get status       => _status;
   TodoModel? get selectedTodo => _selectedTodo;
   String get errorMessage     => _errorMessage;
+  TodoFilter get filter       => _filter;
+  bool get hasMore            => _hasMore;
+  bool get isLoadingMore      => _isLoadingMore;
 
   List<TodoModel> get todos {
-    if (_searchQuery.isEmpty) return List.unmodifiable(_todos);
-    return _todos
-        .where((t) =>
-        t.title.toLowerCase().contains(_searchQuery.toLowerCase()))
-        .toList();
+    List<TodoModel> result = _todos;
+
+    // Apply search
+    if (_searchQuery.isNotEmpty) {
+      result = result
+          .where((t) => t.title.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .toList();
+    }
+
+    // Apply filter
+    switch (_filter) {
+      case TodoFilter.done:
+        return result.where((t) => t.isDone).toList();
+      case TodoFilter.pending:
+        return result.where((t) => !t.isDone).toList();
+      case TodoFilter.all:
+        return List.unmodifiable(result);
+    }
   }
 
   int get totalTodos   => _todos.length;
   int get doneTodos    => _todos.where((t) => t.isDone).length;
   int get pendingTodos => _todos.where((t) => !t.isDone).length;
 
-  // ── Load All Todos ────────────────────────────
+  // ── Load Todos (first page) ───────────────────
   Future<void> loadTodos({required String authToken}) async {
     _setStatus(TodoStatus.loading);
-    final result = await _repository.getTodos(authToken: authToken);
+    _currentPage = 1;
+    _hasMore = true;
+
+    final result = await _repository.getTodos(
+      authToken: authToken,
+      page: _currentPage,
+      perPage: _perPage,
+    );
+
     if (result.success && result.data != null) {
       _todos = result.data!;
+      _hasMore = result.data!.length >= _perPage;
       _setStatus(TodoStatus.success);
     } else {
       _errorMessage = result.message;
       _setStatus(TodoStatus.error);
     }
+  }
+
+  // ── Load More (next page) ──────────────────────
+  Future<void> loadMoreTodos({required String authToken}) async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    final nextPage = _currentPage + 1;
+    final result = await _repository.getTodos(
+      authToken: authToken,
+      page: nextPage,
+      perPage: _perPage,
+    );
+
+    _isLoadingMore = false;
+
+    if (result.success && result.data != null) {
+      _currentPage = nextPage;
+      _todos.addAll(result.data!);
+      _hasMore = result.data!.length >= _perPage;
+    }
+
+    notifyListeners();
   }
 
   // ── Load Single Todo ──────────────────────────
@@ -81,7 +139,12 @@ class TodoProvider extends ChangeNotifier {
       description: description,
     );
     if (result.success) {
-      final listResult = await _repository.getTodos(authToken: authToken);
+      // Reload from page 1
+      final listResult = await _repository.getTodos(
+        authToken: authToken,
+        page: 1,
+        perPage: _currentPage * _perPage,
+      );
       if (listResult.success && listResult.data != null) {
         _todos = listResult.data!;
       }
@@ -110,10 +173,13 @@ class TodoProvider extends ChangeNotifier {
       isDone:      isDone,
     );
     if (result.success) {
-      // Fetch keduanya dulu, baru notify sekali
       final results = await Future.wait([
         _repository.getTodoById(authToken: authToken, todoId: todoId),
-        _repository.getTodos(authToken: authToken),
+        _repository.getTodos(
+          authToken: authToken,
+          page: 1,
+          perPage: _currentPage * _perPage,
+        ),
       ]);
 
       final detailResult = results[0];
@@ -126,7 +192,6 @@ class TodoProvider extends ChangeNotifier {
         _todos = listResult.data as List<TodoModel>;
       }
 
-      // Notify hanya sekali setelah semua data siap
       _setStatus(TodoStatus.success);
       return true;
     }
@@ -152,10 +217,13 @@ class TodoProvider extends ChangeNotifier {
       imageFilename: imageFilename,
     );
     if (result.success) {
-      // Fetch keduanya dulu, baru notify sekali
       final results = await Future.wait([
         _repository.getTodoById(authToken: authToken, todoId: todoId),
-        _repository.getTodos(authToken: authToken),
+        _repository.getTodos(
+          authToken: authToken,
+          page: 1,
+          perPage: _currentPage * _perPage,
+        ),
       ]);
 
       final detailResult = results[0];
@@ -168,7 +236,6 @@ class TodoProvider extends ChangeNotifier {
         _todos = listResult.data as List<TodoModel>;
       }
 
-      // Notify hanya sekali setelah semua data siap
       _setStatus(TodoStatus.success);
       return true;
     }
@@ -186,7 +253,6 @@ class TodoProvider extends ChangeNotifier {
     final result = await _repository.deleteTodo(
         authToken: authToken, todoId: todoId);
     if (result.success) {
-      // Hapus dari list lokal langsung tanpa fetch ulang
       _todos.removeWhere((t) => t.id == todoId);
       _selectedTodo = null;
       _setStatus(TodoStatus.success);
@@ -195,6 +261,12 @@ class TodoProvider extends ChangeNotifier {
     _errorMessage = result.message;
     _setStatus(TodoStatus.error);
     return false;
+  }
+
+  // ── Filter ────────────────────────────────────
+  void setFilter(TodoFilter filter) {
+    _filter = filter;
+    notifyListeners();
   }
 
   // ── Search ────────────────────────────────────

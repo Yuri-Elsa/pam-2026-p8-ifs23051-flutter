@@ -8,16 +8,15 @@ class BottomNavWidget extends StatelessWidget {
   const BottomNavWidget({super.key});
 
   static const _items = [
-    _NavItem(RouteConstants.home,    'Home',   Icons.home_outlined,    Icons.home_rounded),
-    _NavItem(RouteConstants.todos,   'Todos',  Icons.task_outlined,    Icons.task_rounded),
-    _NavItem(RouteConstants.profile, 'Profil', Icons.person_outlined,  Icons.person_rounded),
+    _NavItem(RouteConstants.home,    'Home',   Icons.home_outlined,        Icons.home_rounded),
+    _NavItem(RouteConstants.todos,   'Todos',  Icons.task_alt_outlined,    Icons.task_alt_rounded),
+    _NavItem(RouteConstants.profile, 'Profil', Icons.person_outline_rounded, Icons.person_rounded),
   ];
 
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
 
-    // Hitung index aktif berdasarkan rute saat ini
     int selectedIndex = 0;
     for (int i = 0; i < _items.length; i++) {
       if (location.startsWith(_items[i].route)) {
@@ -34,7 +33,6 @@ class BottomNavWidget extends StatelessWidget {
         }
       },
       destinations: _items.map((item) {
-        final _ = _items.indexOf(item) == selectedIndex;
         return NavigationDestination(
           icon: Icon(item.icon),
           selectedIcon: Icon(item.activeIcon),
@@ -47,7 +45,6 @@ class BottomNavWidget extends StatelessWidget {
 
 class _NavItem {
   const _NavItem(this.route, this.label, this.icon, this.activeIcon);
-
   final String route;
   final String label;
   final IconData icon;

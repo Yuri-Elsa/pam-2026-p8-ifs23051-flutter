@@ -22,14 +22,22 @@ class TodoService {
   };
 
   // ─────────────────────────────────────────────
-  // GET /todos?search=
+  // GET /todos?search=&page=&perPage=
   // ─────────────────────────────────────────────
   Future<ApiResponse<List<TodoModel>>> getTodos({
     required String authToken,
     String search = '',
+    int page = 1,
+    int perPage = 10,
   }) async {
+    final queryParams = <String, String>{
+      'page': page.toString(),
+      'perPage': perPage.toString(),
+    };
+    if (search.isNotEmpty) queryParams['search'] = search;
+
     final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.todos}')
-        .replace(queryParameters: search.isNotEmpty ? {'search': search} : null);
+        .replace(queryParameters: queryParams);
 
     final response = await _client.get(uri, headers: _authHeader(authToken));
     final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -46,8 +54,6 @@ class TodoService {
 
   // ─────────────────────────────────────────────
   // POST /todos
-  // Body JSON: { title, description }
-  // Response: { data: { todoId } }
   // ─────────────────────────────────────────────
   Future<ApiResponse<String>> createTodo({
     required String authToken,
@@ -91,7 +97,6 @@ class TodoService {
 
   // ─────────────────────────────────────────────
   // PUT /todos/:id
-  // Body JSON: { title, description, isDone }
   // ─────────────────────────────────────────────
   Future<ApiResponse<void>> updateTodo({
     required String authToken,
@@ -116,8 +121,6 @@ class TodoService {
 
   // ─────────────────────────────────────────────
   // PUT /todos/:id/cover
-  // Multipart form-data, field: file
-  // Mendukung Web (Uint8List) dan Mobile (File)
   // ─────────────────────────────────────────────
   Future<ApiResponse<void>> updateTodoCover({
     required String authToken,

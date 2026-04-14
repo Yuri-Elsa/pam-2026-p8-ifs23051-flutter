@@ -43,7 +43,7 @@ class _TodosAddScreenState extends State<TodosAddScreen> {
 
     if (success) {
       showAppSnackBar(context,
-          message: 'Todo berhasil ditambahkan.', type: SnackBarType.success);
+          message: 'Todo berhasil ditambahkan!', type: SnackBarType.success);
       Navigator.of(context).pop(true);
     } else {
       showAppSnackBar(context,
@@ -54,50 +54,103 @@ class _TodosAddScreenState extends State<TodosAddScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: const TopAppBarWidget(title: 'Tambah Todo', showBackButton: true),
+      appBar: const TopAppBarWidget(
+        title: 'Tambah Todo',
+        showBackButton: true,
+        showThemeToggle: false,
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Header info
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lightbulb_outline_rounded,
+                        color: colorScheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Buat todo baru dan pantau progresmu.',
+                        style: TextStyle(
+                          color: colorScheme.onPrimaryContainer,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              Text(
+                'Judul',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _titleCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Judul Todo',
-                  prefixIcon: Icon(Icons.title),
-                  border: OutlineInputBorder(),
+                  hintText: 'Contoh: Belajar Flutter...',
+                  prefixIcon: Icon(Icons.title_rounded),
                 ),
                 textInputAction: TextInputAction.next,
                 validator: (v) =>
                 (v == null || v.trim().isEmpty) ? 'Judul tidak boleh kosong.' : null,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
+
+              Text(
+                'Deskripsi',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _descCtrl,
-                maxLines: 5,
+                maxLines: 6,
                 decoration: const InputDecoration(
-                  labelText: 'Deskripsi',
-                  prefixIcon: Icon(Icons.description_outlined),
-                  border: OutlineInputBorder(),
+                  hintText: 'Jelaskan detail todo ini...',
+                  prefixIcon: Padding(
+                    padding: EdgeInsets.only(bottom: 80),
+                    child: Icon(Icons.description_outlined),
+                  ),
                   alignLabelWithHint: true,
                 ),
                 validator: (v) =>
                 (v == null || v.trim().isEmpty) ? 'Deskripsi tidak boleh kosong.' : null,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
+
               FilledButton.icon(
                 onPressed: _isLoading ? null : _submit,
                 icon: _isLoading
                     ? const SizedBox(
                     width: 20, height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.save_outlined),
-                label: Text(_isLoading ? 'Menyimpan...' : 'Simpan'),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.add_task_rounded),
+                label: Text(
+                  _isLoading ? 'Menyimpan...' : 'Tambahkan Todo',
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600),
+                ),
                 style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14)),
+                    padding: const EdgeInsets.symmetric(vertical: 16)),
               ),
             ],
           ),
