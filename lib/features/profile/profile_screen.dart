@@ -29,14 +29,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _profileLoading = false;
 
   // ── Change Password State ───────────
-  final _passFormKey  = GlobalKey<FormState>();
-  final _currPassCtrl = TextEditingController();
-  final _newPassCtrl  = TextEditingController();
-  final _confPassCtrl = TextEditingController();
-  bool _passLoading   = false;
-  bool _showCurrPass  = false;
-  bool _showNewPass   = false;
-  bool _showConfPass  = false;
+  final _passFormKey   = GlobalKey<FormState>();
+  final _currPassCtrl  = TextEditingController();
+  final _newPassCtrl   = TextEditingController();
+  final _confPassCtrl  = TextEditingController();
+  bool _passLoading    = false;
+  bool _showCurrPass   = false;
+  bool _showNewPass    = false;
+  bool _showConfPass   = false;
 
   // ── Photo State ─────────────────────
   bool _photoUploading = false;
@@ -80,16 +80,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (!mounted) return;
+      setState(() => _photoUploading = false);
 
       if (success) {
-        // AuthProvider sudah handle evict cache dan fetch URL baru dari server.
-        // Cukup setState untuk rebuild widget dengan URL baru dari provider.
-        setState(() => _photoUploading = false);
         showAppSnackBar(context,
             message: 'Foto profil berhasil diperbarui!',
             type: SnackBarType.success);
       } else {
-        setState(() => _photoUploading = false);
         showAppSnackBar(context,
             message: context.read<AuthProvider>().errorMessage,
             type: SnackBarType.error);
@@ -254,8 +251,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return const Scaffold(body: LoadingWidget());
     }
 
-    final photoUrl = user?.urlPhoto;
-    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+    // Gunakan provider.photoUrl, BUKAN user.urlPhoto.
+    // Alasannya: GET /users/me di backend TIDAK mengembalikan urlPhoto
+    // (field urlPhoto tidak ada di UserResponse). provider.photoUrl
+    // membangun URL dari userId + timestamp cache-buster secara manual.
+    final photoUrl = provider.photoUrl;
 
     return Scaffold(
       appBar: TopAppBarWidget(
@@ -292,23 +292,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
-                        // Gunakan CachedNetworkImage dengan key dari URL itu sendiri.
-                        // Backend sudah menggunakan UUID baru setiap upload, jadi
-                        // URL yang baru = foto yang baru. ValueKey(photoUrl) memaksa
-                        // Flutter rebuild widget ini saat URL berubah.
-                        child: hasPhoto
-                            ? CircleAvatar(
-                          key: ValueKey(photoUrl),
+                        child: CircleAvatar(
                           radius: 56,
                           backgroundColor: colorScheme.primaryContainer,
-                          child: ClipOval(
+                          // photoUrl berisi timestamp sebagai query param,
+                          // sehingga setiap upload foto = URL baru = cache miss
+                          // = CachedNetworkImage fetch ulang dari server.
+                          child: photoUrl != null
+                              ? ClipOval(
                             child: CachedNetworkImage(
+                              // ValueKey memaksa widget rebuild total
+                              // saat URL berubah (timestamp naik)
+                              key: ValueKey(photoUrl),
                               imageUrl: photoUrl,
                               width: 112,
                               height: 112,
                               fit: BoxFit.cover,
-                              // useOldImageOnUrlChange: false → saat URL berubah,
-                              // langsung tampilkan placeholder, bukan foto lama
                               useOldImageOnUrlChange: false,
                               placeholder: (_, __) => Container(
                                 width: 112,
@@ -321,38 +320,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                 ),
                               ),
-                              errorWidget: (_, __, ___) => Container(
-                                width: 112,
-                                height: 112,
-                                color: colorScheme.primaryContainer,
-                                child: Center(
-                                  child: Text(
-                                    (user?.name.isNotEmpty == true)
-                                        ? user!.name[0].toUpperCase()
-                                        : '?',
-                                    style: TextStyle(
-                                      fontSize: 38,
-                                      color: colorScheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
+                              errorWidget: (_, __, ___) => _AvatarFallback(
+                                name: user?.name ?? '',
+                                colorScheme: colorScheme,
                               ),
                             ),
-                          ),
-                        )
-                            : CircleAvatar(
-                          radius: 56,
-                          backgroundColor: colorScheme.primaryContainer,
-                          child: Text(
-                            (user?.name.isNotEmpty == true)
-                                ? user!.name[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              fontSize: 38,
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          )
+                              : _AvatarFallback(
+                            name: user?.name ?? '',
+                            colorScheme: colorScheme,
                           ),
                         ),
                       ),
@@ -460,9 +436,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.save_outlined),
-                      label: Text(_profileLoading
-                          ? 'Menyimpan...'
-                          : 'Simpan Profil'),
+                      label: Text(_profileLoading ? 'Menyimpan...' : 'Simpan Profil'),
                       style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14)),
                     ),
@@ -485,8 +459,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: _currPassCtrl,
                     label: 'Kata Sandi Saat Ini',
                     show: _showCurrPass,
-                    onToggle: () =>
-                        setState(() => _showCurrPass = !_showCurrPass),
+                    onToggle: () => setState(() => _showCurrPass = !_showCurrPass),
                     validator: (v) => (v == null || v.isEmpty)
                         ? 'Kata sandi saat ini diperlukan.'
                         : null,
@@ -496,8 +469,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: _newPassCtrl,
                     label: 'Kata Sandi Baru',
                     show: _showNewPass,
-                    onToggle: () =>
-                        setState(() => _showNewPass = !_showNewPass),
+                    onToggle: () => setState(() => _showNewPass = !_showNewPass),
                     validator: (v) => (v == null || v.trim().length < 6)
                         ? 'Minimal 6 karakter.'
                         : null,
@@ -507,8 +479,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: _confPassCtrl,
                     label: 'Konfirmasi Kata Sandi Baru',
                     show: _showConfPass,
-                    onToggle: () =>
-                        setState(() => _showConfPass = !_showConfPass),
+                    onToggle: () => setState(() => _showConfPass = !_showConfPass),
                     validator: (v) => v != _newPassCtrl.text
                         ? 'Kata sandi tidak cocok.'
                         : null,
@@ -524,9 +495,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.key_rounded),
-                      label: Text(_passLoading
-                          ? 'Mengubah...'
-                          : 'Ganti Kata Sandi'),
+                      label: Text(_passLoading ? 'Mengubah...' : 'Ganti Kata Sandi'),
                       style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14)),
                     ),
@@ -559,6 +528,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+// ── Helper Widget: Inisial nama sebagai fallback avatar ──────────
+class _AvatarFallback extends StatelessWidget {
+  const _AvatarFallback({required this.name, required this.colorScheme});
+  final String name;
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      name.isNotEmpty ? name[0].toUpperCase() : '?',
+      style: TextStyle(
+        fontSize: 38,
+        color: colorScheme.primary,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+}
+
 // ── Helper Widgets ──────────────────────────────────────
 class _SectionCard extends StatelessWidget {
   const _SectionCard({
@@ -567,9 +555,9 @@ class _SectionCard extends StatelessWidget {
     required this.child,
   });
 
-  final String title;
+  final String   title;
   final IconData icon;
-  final Widget child;
+  final Widget   child;
 
   @override
   Widget build(BuildContext context) {
@@ -623,11 +611,11 @@ class _PasswordField extends StatelessWidget {
     required this.validator,
   });
 
-  final TextEditingController controller;
-  final String label;
-  final bool show;
-  final VoidCallback onToggle;
-  final String? Function(String?) validator;
+  final TextEditingController       controller;
+  final String                      label;
+  final bool                        show;
+  final VoidCallback                onToggle;
+  final String? Function(String?)   validator;
 
   @override
   Widget build(BuildContext context) {
