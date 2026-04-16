@@ -73,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               stretch: true,
               actions: [
                 IconButton(
-                  icon: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
+                  icon: Icon(isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined),
                   onPressed: () => themeProvider.toggleTheme(),
                   tooltip: isDark ? 'Mode Terang' : 'Mode Gelap',
                 ),

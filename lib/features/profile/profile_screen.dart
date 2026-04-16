@@ -70,7 +70,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       if (picked == null || !mounted) return;
 
-      final bytes = await picked.readAsBytes();
+      // Di mobile, cukup pakai File — tidak perlu baca bytes
+      // Di web, tidak ada File sehingga harus pakai bytes
+      final Uint8List? bytes = kIsWeb ? await picked.readAsBytes() : null;
       setState(() => _photoUploading = true);
 
       final success = await context.read<AuthProvider>().updatePhoto(

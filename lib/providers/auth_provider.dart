@@ -98,7 +98,10 @@ class AuthProvider extends ChangeNotifier {
         authToken:    result.data!['authToken']!,
         refreshToken: result.data!['refreshToken']!,
       );
-      await loadProfile();
+      // Set authenticated dulu agar UI langsung muncul tanpa menunggu getMe
+      _setStatus(AuthStatus.authenticated);
+      // Load profile di background, tidak blocking login
+      loadProfile(silent: true);
       return true;
     }
     _errorMessage = result.message;
@@ -223,11 +226,8 @@ class AuthProvider extends ChangeNotifier {
       // sehingga CachedNetworkImage fetch ulang dari server
       await _bumpPhotoTimestamp();
 
-      // Refresh data user (nama, username, dll)
-      final profileResult = await _repository.getMe(authToken: _authToken!);
-      if (profileResult.success && profileResult.data != null) {
-        _user = profileResult.data;
-      }
+      // Tidak perlu getMe lagi — data user (nama, username) tidak berubah
+      // saat upload foto. Hanya photoUrl yang perlu di-refresh via timestamp.
 
       _isUpdating = false;
       _setStatus(AuthStatus.authenticated);
