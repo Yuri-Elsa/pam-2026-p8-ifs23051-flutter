@@ -46,146 +46,234 @@ class _DelcomTodosAppState extends State<DelcomTodosApp> {
   }
 
   ThemeData _buildLightTheme() {
-    const seedColor = Color(0xFF4361EE);
+    // Nebula Light: deep violet/indigo tones with cosmic accents
+    const seedColor = Color(0xFF6C3DE1);  // Deep violet
     final cs = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.light,
-      primary: seedColor,
-      secondary: const Color(0xFF7209B7),
-      tertiary: const Color(0xFF06D6A0),
+      primary: const Color(0xFF6C3DE1),       // Deep violet
+      onPrimary: Colors.white,
+      secondary: const Color(0xFFE040C8),     // Nebula magenta
+      onSecondary: Colors.white,
+      tertiary: const Color(0xFF00C2FF),      // Star blue
+      onTertiary: Colors.white,
+      surface: const Color(0xFFF5F3FF),       // Soft lavender white
+      onSurface: const Color(0xFF1A1035),
+      surfaceContainerHighest: const Color(0xFFEBE7FF),
     );
     return ThemeData(
       colorScheme: cs,
       useMaterial3: true,
       fontFamily: 'Roboto',
+      scaffoldBackgroundColor: const Color(0xFFF0EEFF),
       cardTheme: CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: cs.surfaceContainerHighest.withOpacity(0.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        color: const Color(0xFFEFEBFF).withOpacity(0.8),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.outlineVariant),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: const Color(0xFF6C3DE1).withOpacity(0.3)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.primary, width: 2),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF6C3DE1), width: 2),
         ),
         filled: true,
-        fillColor: cs.surfaceContainerHighest.withOpacity(0.3),
+        fillColor: const Color(0xFFEFEBFF).withOpacity(0.6),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        prefixIconColor: const Color(0xFF6C3DE1),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFF6C3DE1),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          side: const BorderSide(color: Color(0xFF6C3DE1)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          foregroundColor: const Color(0xFF6C3DE1),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,
-        backgroundColor: cs.surfaceContainerHighest.withOpacity(0.8),
-        indicatorColor: cs.primary.withOpacity(0.15),
+        backgroundColor: const Color(0xFFEEEAFF).withOpacity(0.95),
+        indicatorColor: const Color(0xFF6C3DE1).withOpacity(0.18),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         height: 64,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: Color(0xFF6C3DE1));
+          }
+          return const IconThemeData(color: Color(0xFF8A7AAF));
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+                color: Color(0xFF6C3DE1), fontWeight: FontWeight.bold, fontSize: 12);
+          }
+          return const TextStyle(color: Color(0xFF8A7AAF), fontSize: 12);
+        }),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: cs.surface,
+        backgroundColor: const Color(0xFFF0EEFF),
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: false,
-        titleTextStyle: TextStyle(
-          color: cs.onSurface,
+        titleTextStyle: const TextStyle(
+          color: Color(0xFF1A1035),
           fontWeight: FontWeight.bold,
           fontSize: 18,
         ),
-        iconTheme: IconThemeData(color: cs.onSurface),
+        iconTheme: const IconThemeData(color: Color(0xFF6C3DE1)),
       ),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return const Color(0xFF6C3DE1);
+          return null;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const Color(0xFF6C3DE1).withOpacity(0.4);
+          }
+          return null;
+        }),
       ),
     );
   }
 
   ThemeData _buildDarkTheme() {
-    const seedColor = Color(0xFF4CC9F0);
+    // Nebula Dark: deep space background with glowing cosmic colors
+    const seedColor = Color(0xFF9D6FFF);  // Bright nebula purple
     final cs = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.dark,
-      primary: seedColor,
-      secondary: const Color(0xFFF72585),
-      tertiary: const Color(0xFF06D6A0),
+      primary: const Color(0xFF9D6FFF),       // Nebula violet
+      onPrimary: Colors.white,
+      secondary: const Color(0xFFFF6EE7),     // Hot pink nebula
+      onSecondary: Colors.white,
+      tertiary: const Color(0xFF00D4FF),      // Star cluster blue
+      surface: const Color(0xFF0E0A1E),       // Deep space
+      onSurface: const Color(0xFFE8E0FF),
+      surfaceContainerHighest: const Color(0xFF1A1535),
     );
     return ThemeData(
       colorScheme: cs,
       useMaterial3: true,
       fontFamily: 'Roboto',
-      scaffoldBackgroundColor: const Color(0xFF0D1117),
+      scaffoldBackgroundColor: const Color(0xFF080514),  // Deep space black
       cardTheme: CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: const Color(0xFF161B22),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        color: const Color(0xFF160F2E),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF30363D)),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF3D2A6B)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: cs.primary, width: 2),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF9D6FFF), width: 2),
         ),
         filled: true,
-        fillColor: const Color(0xFF161B22),
+        fillColor: const Color(0xFF1A1535),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        prefixIconColor: const Color(0xFF9D6FFF),
+        labelStyle: const TextStyle(color: Color(0xFF9D6FFF)),
+        hintStyle: TextStyle(color: const Color(0xFFE8E0FF).withOpacity(0.4)),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFF6C3DE1),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          foregroundColor: const Color(0xFF9D6FFF),
+          side: const BorderSide(color: Color(0xFF9D6FFF)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF9D6FFF),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,
-        backgroundColor: const Color(0xFF0D1117),
-        indicatorColor: cs.primary.withOpacity(0.2),
+        backgroundColor: const Color(0xFF0E0A1E),
+        indicatorColor: const Color(0xFF9D6FFF).withOpacity(0.2),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         height: 64,
         surfaceTintColor: Colors.transparent,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: Color(0xFF9D6FFF));
+          }
+          return const IconThemeData(color: Color(0xFF5A4A7A));
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+                color: Color(0xFF9D6FFF), fontWeight: FontWeight.bold, fontSize: 12);
+          }
+          return const TextStyle(color: Color(0xFF5A4A7A), fontSize: 12);
+        }),
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF0D1117),
+        backgroundColor: Color(0xFF080514),
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          color: Colors.white,
+          color: Color(0xFFE8E0FF),
           fontWeight: FontWeight.bold,
           fontSize: 18,
         ),
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: Color(0xFF9D6FFF)),
       ),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return const Color(0xFF9D6FFF);
+          return null;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const Color(0xFF9D6FFF).withOpacity(0.4);
+          }
+          return null;
+        }),
+      ),
+      dialogTheme: const DialogThemeData(
+        backgroundColor: Color(0xFF160F2E),
+      ),
+      popupMenuTheme: const PopupMenuThemeData(
+        color: Color(0xFF1A1535),
       ),
     );
   }

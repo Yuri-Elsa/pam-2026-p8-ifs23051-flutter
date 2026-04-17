@@ -51,9 +51,9 @@ class _TodosScreenState extends State<TodosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider    = context.watch<TodoProvider>();
-    final token       = context.read<AuthProvider>().authToken ?? '';
-    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final provider = context.watch<TodoProvider>();
+    final token = context.read<AuthProvider>().authToken ?? '';
 
     return Scaffold(
       appBar: TopAppBarWidget(
@@ -70,20 +70,23 @@ class _TodosScreenState extends State<TodosScreen> {
             .then((_) => _loadData()),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Tambah'),
+        backgroundColor: const Color(0xFF6C3DE1),
+        foregroundColor: Colors.white,
         elevation: 4,
       ),
       body: Column(
         children: [
-          // ── Filter Bar ──
-          _FilterBar(
+          // Filter bar
+          _NebulaFilterBar(
             selected: provider.filter,
             onSelected: (f) => context.read<TodoProvider>().setFilter(f),
             total: provider.totalTodos,
             done: provider.doneTodos,
             pending: provider.pendingTodos,
+            isDark: isDark,
           ),
 
-          // ── Content ──
+          // Content
           Expanded(
             child: switch (provider.status) {
               TodoStatus.loading when provider.todos.isEmpty =>
@@ -92,35 +95,40 @@ class _TodosScreenState extends State<TodosScreen> {
                   AppErrorWidget(
                       message: provider.errorMessage, onRetry: _loadData),
               _ => provider.todos.isEmpty
-                  ? _EmptyState(filter: provider.filter)
+                  ? _NebulaEmptyState(filter: provider.filter, isDark: isDark)
                   : RefreshIndicator(
                 onRefresh: () async => _loadData(),
                 child: ListView.separated(
                   controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                  itemCount: provider.todos.length + (provider.isLoadingMore ? 1 : 0),
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  padding:
+                  const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                  itemCount: provider.todos.length +
+                      (provider.isLoadingMore ? 1 : 0),
+                  separatorBuilder: (_, __) =>
+                  const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     if (i == provider.todos.length) {
                       return const Padding(
                         padding: EdgeInsets.all(16),
-                        child: Center(child: CircularProgressIndicator()),
+                        child: Center(
+                            child: CircularProgressIndicator(
+                                color: Color(0xFF9D6FFF))),
                       );
                     }
                     final todo = provider.todos[i];
-                    return _TodoCard(
+                    return _NebulaTodoCard(
                       todo: todo,
-                      index: i,
+                      isDark: isDark,
                       onTap: () => context
                           .push(RouteConstants.todosDetail(todo.id))
                           .then((_) => _loadData()),
                       onToggle: () async {
                         final success = await provider.editTodo(
-                          authToken:   token,
-                          todoId:      todo.id,
-                          title:       todo.title,
+                          authToken: token,
+                          todoId: todo.id,
+                          title: todo.title,
                           description: todo.description,
-                          isDone:      !todo.isDone,
+                          isDone: !todo.isDone,
                         );
                         if (!success && mounted) {
                           showAppSnackBar(context,
@@ -140,14 +148,14 @@ class _TodosScreenState extends State<TodosScreen> {
   }
 }
 
-// ── Filter Bar ──────────────────────────────────────────────
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({
+class _NebulaFilterBar extends StatelessWidget {
+  const _NebulaFilterBar({
     required this.selected,
     required this.onSelected,
     required this.total,
     required this.done,
     required this.pending,
+    required this.isDark,
   });
 
   final TodoFilter selected;
@@ -155,44 +163,46 @@ class _FilterBar extends StatelessWidget {
   final int total;
   final int done;
   final int pending;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: isDark ? const Color(0xFF0E0A1E) : const Color(0xFFF0EEFF),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.05),
-            blurRadius: 4,
+            color: const Color(0xFF6C3DE1).withOpacity(0.05),
+            blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
-          _FilterChipItem(
+          _NebulaFilterChip(
             label: 'Semua ($total)',
             selected: selected == TodoFilter.all,
             onTap: () => onSelected(TodoFilter.all),
-            color: colorScheme.primary,
+            selectedColor: const Color(0xFF6C3DE1),
+            isDark: isDark,
           ),
           const SizedBox(width: 8),
-          _FilterChipItem(
+          _NebulaFilterChip(
             label: 'Selesai ($done)',
             selected: selected == TodoFilter.done,
             onTap: () => onSelected(TodoFilter.done),
-            color: const Color(0xFF4CAF50),
+            selectedColor: const Color(0xFF0D9488),
+            isDark: isDark,
           ),
           const SizedBox(width: 8),
-          _FilterChipItem(
+          _NebulaFilterChip(
             label: 'Belum ($pending)',
             selected: selected == TodoFilter.pending,
             onTap: () => onSelected(TodoFilter.pending),
-            color: const Color(0xFFFF9800),
+            selectedColor: const Color(0xFFDB2777),
+            isDark: isDark,
           ),
         ],
       ),
@@ -200,18 +210,20 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-class _FilterChipItem extends StatelessWidget {
-  const _FilterChipItem({
+class _NebulaFilterChip extends StatelessWidget {
+  const _NebulaFilterChip({
     required this.label,
     required this.selected,
     required this.onTap,
-    required this.color,
+    required this.selectedColor,
+    required this.isDark,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final Color color;
+  final Color selectedColor;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -219,19 +231,37 @@ class _FilterChipItem extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding:
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? color : color.withOpacity(0.08),
+          gradient: selected
+              ? LinearGradient(colors: [
+            selectedColor,
+            selectedColor.withOpacity(0.7),
+          ])
+              : null,
+          color: selected
+              ? null
+              : (isDark
+              ? const Color(0xFF1A1535)
+              : Colors.white.withOpacity(0.7)),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? color : color.withOpacity(0.3),
+            color: selected
+                ? selectedColor
+                : selectedColor.withOpacity(0.3),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : color,
-            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            color: selected
+                ? Colors.white
+                : (isDark
+                ? selectedColor.withOpacity(0.9)
+                : selectedColor),
+            fontWeight:
+            selected ? FontWeight.bold : FontWeight.normal,
             fontSize: 12.5,
           ),
         ),
@@ -240,18 +270,29 @@ class _FilterChipItem extends StatelessWidget {
   }
 }
 
-// ── Empty State ──────────────────────────────────────────────
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.filter});
+class _NebulaEmptyState extends StatelessWidget {
+  const _NebulaEmptyState({required this.filter, required this.isDark});
   final TodoFilter filter;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final messages = {
-      TodoFilter.all:     ('Belum ada todo', 'Ketuk + untuk menambahkan todo baru', Icons.inbox_outlined),
-      TodoFilter.done:    ('Belum ada yang selesai', 'Tandai todo sebagai selesai', Icons.check_circle_outline),
-      TodoFilter.pending: ('Semua sudah selesai!', 'Kamu telah menyelesaikan semua todo 🎉', Icons.celebration_outlined),
+      TodoFilter.all: (
+      'Galaksi todo kosong',
+      'Tambahkan bintang todo pertamamu',
+      Icons.auto_awesome_outlined
+      ),
+      TodoFilter.done: (
+      'Belum ada yang selesai',
+      'Tandai todo sebagai selesai',
+      Icons.check_circle_outline
+      ),
+      TodoFilter.pending: (
+      'Semua sudah selesai!',
+      'Kamu telah menaklukkan galaksi 🌌',
+      Icons.celebration_outlined
+      ),
     };
     final (title, subtitle, icon) = messages[filter]!;
 
@@ -261,21 +302,40 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 72, color: colorScheme.outline.withOpacity(0.5)),
-            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF6C3DE1).withOpacity(0.1),
+                border: Border.all(
+                  color: const Color(0xFF6C3DE1).withOpacity(0.3),
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: 52,
+                color: const Color(0xFF9D6FFF),
+              ),
+            ),
+            const SizedBox(height: 20),
             Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: colorScheme.onSurfaceVariant,
+                fontSize: 18,
+                color: isDark
+                    ? const Color(0xFFE8E0FF)
+                    : const Color(0xFF1A1035),
               ),
             ),
             const SizedBox(height: 8),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.outline,
+              style: TextStyle(
+                color: isDark
+                    ? const Color(0xFF7A6AAF)
+                    : const Color(0xFF8A7AAF),
               ),
             ),
           ],
@@ -285,106 +345,117 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-// ── Todo Card ──────────────────────────────────────────────
-class _TodoCard extends StatelessWidget {
-  const _TodoCard({
+class _NebulaTodoCard extends StatelessWidget {
+  const _NebulaTodoCard({
     required this.todo,
-    required this.index,
+    required this.isDark,
     required this.onTap,
     required this.onToggle,
   });
 
   final TodoModel todo;
-  final int index;
+  final bool isDark;
   final VoidCallback onTap;
   final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final isDone = todo.isDone;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: isDark
+                ? const Color(0xFF160F2E).withOpacity(0.9)
+                : Colors.white.withOpacity(0.85),
+            border: Border.all(
               color: isDone
-                  ? const Color(0xFF4CAF50).withOpacity(0.06)
-                  : colorScheme.surfaceContainerHighest.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isDone
-                    ? const Color(0xFF4CAF50).withOpacity(0.25)
-                    : colorScheme.outlineVariant.withOpacity(0.5),
-              ),
+                  ? const Color(0xFF0D9488).withOpacity(isDark ? 0.3 : 0.25)
+                  : const Color(0xFF6C3DE1).withOpacity(isDark ? 0.2 : 0.15),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  // Toggle button
-                  GestureDetector(
-                    onTap: onToggle,
-                    behavior: HitTestBehavior.opaque,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: Icon(
-                        isDone
-                            ? Icons.check_circle_rounded
-                            : Icons.radio_button_unchecked_rounded,
-                        key: ValueKey(isDone),
-                        color: isDone ? const Color(0xFF4CAF50) : colorScheme.outline,
-                        size: 28,
-                      ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 16, vertical: 13),
+            child: Row(
+              children: [
+                // Toggle
+                GestureDetector(
+                  onTap: onToggle,
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: isDone
+                        ? const Icon(
+                      Icons.check_circle_rounded,
+                      key: ValueKey(true),
+                      color: Color(0xFF0D9488),
+                      size: 26,
+                    )
+                        : Icon(
+                      Icons.radio_button_unchecked_rounded,
+                      key: const ValueKey(false),
+                      color: const Color(0xFF9D6FFF).withOpacity(0.6),
+                      size: 26,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                ),
+                const SizedBox(width: 12),
 
-                  // Content
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          todo.title,
-                          style: TextStyle(
-                            decoration: isDone ? TextDecoration.lineThrough : null,
-                            decorationColor: colorScheme.outline,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: isDone
-                                ? colorScheme.onSurface.withOpacity(0.5)
-                                : colorScheme.onSurface,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        todo.title,
+                        style: TextStyle(
+                          decoration:
+                          isDone ? TextDecoration.lineThrough : null,
+                          decorationColor:
+                          const Color(0xFF9D6FFF).withOpacity(0.5),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: isDone
+                              ? (isDark
+                              ? const Color(0xFF5A4A7A)
+                              : const Color(0xFF8A7AAF))
+                              : (isDark
+                              ? const Color(0xFFE8E0FF)
+                              : const Color(0xFF1A1035)),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          todo.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: colorScheme.onSurfaceVariant.withOpacity(0.8),
-                          ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        todo.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? const Color(0xFF6A5A9A)
+                              : const Color(0xFF8A7AAF),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 13,
-                    color: colorScheme.outline,
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: isDark
+                      ? const Color(0xFF5A4A7A)
+                      : const Color(0xFF8A7AAF),
+                ),
+              ],
             ),
           ),
         ),

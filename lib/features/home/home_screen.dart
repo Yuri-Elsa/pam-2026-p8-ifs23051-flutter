@@ -7,6 +7,7 @@ import '../../core/constants/route_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../shared/widgets/nebula_background.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,7 +16,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
 
@@ -26,7 +28,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
-    _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    _fadeAnim =
+        CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -45,375 +48,420 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme   = Theme.of(context).colorScheme;
-    final user          = context.watch<AuthProvider>().user;
-    final provider      = context.watch<TodoProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final user = context.watch<AuthProvider>().user;
+    final provider = context.watch<TodoProvider>();
     final themeProvider = context.watch<ThemeProvider>();
-    final isDark        = themeProvider.isDark;
 
-    final total   = provider.totalTodos;
-    final done    = provider.doneTodos;
+    final total = provider.totalTodos;
+    final done = provider.doneTodos;
     final pending = provider.pendingTodos;
     final progress = total > 0 ? done / total : 0.0;
 
+    // Nebula colors
+    const nebulaViolet = Color(0xFF6C3DE1);
+    const nebulaBlue = Color(0xFF0EA5E9);
+    const nebulaPink = Color(0xFFDB2777);
+    const nebulaTeal = Color(0xFF0D9488);
+
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: () async {
-          final token = context.read<AuthProvider>().authToken;
-          if (token != null) {
-            await context.read<TodoProvider>().loadTodos(authToken: token);
-          }
-        },
-        child: CustomScrollView(
-          slivers: [
-            // ── Hero Header ──
-            SliverAppBar(
-              expandedHeight: 200,
-              pinned: true,
-              stretch: true,
-              actions: [
-                IconButton(
-                  icon: Icon(isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined),
-                  onPressed: () => themeProvider.toggleTheme(),
-                  tooltip: isDark ? 'Mode Terang' : 'Mode Gelap',
-                ),
-                const SizedBox(width: 8),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
-                titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-                title: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Halo, ${user?.name ?? '—'} 👋',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
+      body: NebulaBackground(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            final token = context.read<AuthProvider>().authToken;
+            if (token != null) {
+              await context.read<TodoProvider>().loadTodos(authToken: token);
+            }
+          },
+          child: CustomScrollView(
+            slivers: [
+              // ── Nebula AppBar ──
+              SliverAppBar(
+                expandedHeight: 200,
+                pinned: true,
+                stretch: true,
+                backgroundColor: Colors.transparent,
+                actions: [
+                  IconButton(
+                    icon: Icon(
+                      themeProvider.isDark
+                          ? Icons.dark_mode_outlined
+                          : Icons.light_mode_outlined,
+                      color: Colors.white,
                     ),
-                    Text(
-                      'Kelola todo-mu hari ini',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.85),
-                        fontSize: 11,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? [
-                        colorScheme.primary.withOpacity(0.8),
-                        colorScheme.tertiary.withOpacity(0.5),
-                      ]
-                          : [
-                        colorScheme.primary,
-                        colorScheme.primaryContainer,
-                      ],
-                    ),
+                    onPressed: () => themeProvider.toggleTheme(),
+                    tooltip: themeProvider.isDark ? 'Mode Terang' : 'Mode Gelap',
                   ),
-                  child: Stack(
+                  const SizedBox(width: 8),
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  stretchModes: const [StretchMode.zoomBackground],
+                  titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+                  title: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Positioned(
-                        right: -30,
-                        top: -20,
-                        child: Container(
-                          width: 160,
-                          height: 160,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.08),
-                          ),
+                      Text(
+                        'Halo, ${user?.name ?? '—'} ✨',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.white,
                         ),
                       ),
-                      Positioned(
-                        right: 40,
-                        bottom: 20,
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.06),
-                          ),
+                      Text(
+                        'Jelajahi galaksi todo-mu',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 11,
+                          fontWeight: FontWeight.normal,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-            ),
-
-            // ── Body Content ──
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  FadeTransition(
-                    opacity: _fadeAnim,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  background: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF3B1181),
+                          Color(0xFF6C3DE1),
+                          Color(0xFF9D174D),
+                        ],
+                      ),
+                    ),
+                    child: Stack(
                       children: [
-                        // ── Progress Card ──
-                        _ProgressCard(
-                          total: total,
-                          done: done,
-                          pending: pending,
-                          progress: progress,
-                        ),
-                        const SizedBox(height: 20),
-
-                        // ── Stat Cards Row ──
-                        Row(
-                          children: [
-                            _StatCard(
-                              label: 'Total',
-                              value: total,
-                              color: colorScheme.primary,
-                              icon: Icons.list_alt_rounded,
-                              bgColor: colorScheme.primaryContainer.withOpacity(0.5),
+                        // Nebula cloud overlay in header
+                        Positioned(
+                          right: -40,
+                          top: -30,
+                          child: Container(
+                            width: 200,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withOpacity(0.06),
                             ),
-                            const SizedBox(width: 10),
-                            _StatCard(
-                              label: 'Selesai',
-                              value: done,
-                              color: const Color(0xFF4CAF50),
-                              icon: Icons.check_circle_rounded,
-                              bgColor: const Color(0xFF4CAF50).withOpacity(0.1),
+                          ),
+                        ),
+                        Positioned(
+                          left: -20,
+                          bottom: -20,
+                          child: Container(
+                            width: 150,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF00D4FF).withOpacity(0.08),
                             ),
-                            const SizedBox(width: 10),
-                            _StatCard(
-                              label: 'Belum',
-                              value: pending,
-                              color: const Color(0xFFFF9800),
-                              icon: Icons.pending_rounded,
-                              bgColor: const Color(0xFFFF9800).withOpacity(0.1),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ── Akses Cepat ──
-                        Text(
-                          'Akses Cepat',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.3,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        _QuickAccessCard(
-                          icon: Icons.checklist_rounded,
-                          title: 'Daftar Todo',
-                          subtitle: 'Lihat dan kelola semua todo-mu',
-                          gradient: LinearGradient(
-                            colors: [colorScheme.primary, colorScheme.primary.withOpacity(0.7)],
-                          ),
-                          onTap: () => context.go(RouteConstants.todos),
-                        ),
-                        const SizedBox(height: 10),
-                        _QuickAccessCard(
-                          icon: Icons.add_task_rounded,
-                          title: 'Tambah Todo Baru',
-                          subtitle: 'Buat tugas baru untuk diselesaikan',
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFF4CAF50),
-                              const Color(0xFF4CAF50).withOpacity(0.7),
-                            ],
-                          ),
-                          onTap: () => context.push(RouteConstants.todosAdd),
-                        ),
-                        const SizedBox(height: 10),
-                        _QuickAccessCard(
-                          icon: Icons.person_rounded,
-                          title: 'Profil Saya',
-                          subtitle: 'Kelola akun dan pengaturan',
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFF9C27B0),
-                              const Color(0xFF9C27B0).withOpacity(0.7),
-                            ],
-                          ),
-                          onTap: () => context.go(RouteConstants.profile),
-                        ),
-                        const SizedBox(height: 24),
+                        // Stars decoration
+                        ..._headerStars(),
                       ],
                     ),
                   ),
-                ]),
+                ),
               ),
-            ),
-          ],
+
+              // ── Body ──
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    FadeTransition(
+                      opacity: _fadeAnim,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Progress Card
+                          _NebulaProgressCard(
+                            total: total,
+                            done: done,
+                            pending: pending,
+                            progress: progress,
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Stat Cards
+                          Row(
+                            children: [
+                              _NebulaStatCard(
+                                label: 'Total',
+                                value: total,
+                                primaryColor: nebulaViolet,
+                                icon: Icons.auto_awesome_rounded,
+                                isDark: isDark,
+                              ),
+                              const SizedBox(width: 10),
+                              _NebulaStatCard(
+                                label: 'Selesai',
+                                value: done,
+                                primaryColor: nebulaTeal,
+                                icon: Icons.check_circle_rounded,
+                                isDark: isDark,
+                              ),
+                              const SizedBox(width: 10),
+                              _NebulaStatCard(
+                                label: 'Belum',
+                                value: pending,
+                                primaryColor: nebulaPink,
+                                icon: Icons.pending_rounded,
+                                isDark: isDark,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Section header
+                          Text(
+                            'Navigasi Cepat',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              letterSpacing: 0.5,
+                              color: isDark
+                                  ? const Color(0xFFE8E0FF)
+                                  : const Color(0xFF1A1035),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Quick access cards
+                          _NebulaQuickCard(
+                            icon: Icons.checklist_rounded,
+                            title: 'Daftar Todo',
+                            subtitle: 'Lihat dan kelola semua todo-mu',
+                            colors: const [Color(0xFF3B1181), Color(0xFF6C3DE1)],
+                            onTap: () => context.go(RouteConstants.todos),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 10),
+                          _NebulaQuickCard(
+                            icon: Icons.add_task_rounded,
+                            title: 'Tambah Todo Baru',
+                            subtitle: 'Buat tugas baru di antariksa',
+                            colors: const [Color(0xFF0C4A6E), Color(0xFF0EA5E9)],
+                            onTap: () => context.push(RouteConstants.todosAdd),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 10),
+                          _NebulaQuickCard(
+                            icon: Icons.person_rounded,
+                            title: 'Profil Saya',
+                            subtitle: 'Pengaturan akun penjelajah',
+                            colors: const [Color(0xFF831843), Color(0xFFDB2777)],
+                            onTap: () => context.go(RouteConstants.profile),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  List<Widget> _headerStars() {
+    return [
+      const Positioned(top: 30, right: 80, child: _StarDot(size: 2.5)),
+      const Positioned(top: 50, right: 120, child: _StarDot(size: 1.5)),
+      const Positioned(top: 25, right: 160, child: _StarDot(size: 2)),
+      const Positioned(top: 70, right: 40, child: _StarDot(size: 1.8)),
+      const Positioned(top: 40, left: 60, child: _StarDot(size: 1.5)),
+      const Positioned(top: 65, left: 100, child: _StarDot(size: 2)),
+      const Positioned(top: 20, left: 140, child: _StarDot(size: 1.2)),
+    ];
+  }
+}
+
+class _StarDot extends StatelessWidget {
+  const _StarDot({required this.size});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withOpacity(0.7),
       ),
     );
   }
 }
 
-class _ProgressCard extends StatelessWidget {
-  const _ProgressCard({
+class _NebulaProgressCard extends StatelessWidget {
+  const _NebulaProgressCard({
     required this.total,
     required this.done,
     required this.pending,
     required this.progress,
+    required this.isDark,
   });
 
   final int total;
   final int done;
   final int pending;
   final double progress;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final percent = (progress * 100).toStringAsFixed(0);
 
-    return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Progress Todo',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '$percent%',
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 10,
-                backgroundColor: colorScheme.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  total == 0
-                      ? colorScheme.outline
-                      : progress == 1.0
-                      ? const Color(0xFF4CAF50)
-                      : colorScheme.primary,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: isDark
+            ? const Color(0xFF160F2E).withOpacity(0.9)
+            : Colors.white.withOpacity(0.8),
+        border: Border.all(
+          color: isDark
+              ? const Color(0xFF3D2A6B).withOpacity(0.5)
+              : const Color(0xFF6C3DE1).withOpacity(0.15),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Progress Kosmik',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: isDark
+                      ? const Color(0xFFE8E0FF)
+                      : const Color(0xFF1A1035),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _ProgressLegend(
-                  color: colorScheme.primary,
-                  label: '$done dari $total selesai',
-                ),
-                const Spacer(),
-                if (total > 0)
-                  Text(
-                    progress == 1.0 ? '🎉 Semua selesai!' : '$pending belum selesai',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+              Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6C3DE1), Color(0xFF9D174D)],
                   ),
-              ],
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$percent%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: isDark
+                  ? const Color(0xFF3D2A6B)
+                  : const Color(0xFFE0D8FF),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFF9D6FFF),
+              ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                '$done dari $total selesai',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark
+                      ? const Color(0xFF9D6FFF)
+                      : const Color(0xFF6C3DE1),
+                ),
+              ),
+              const Spacer(),
+              if (total > 0)
+                Text(
+                  progress == 1.0
+                      ? '🌌 Semua selesai!'
+                      : '$pending menunggu',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? const Color(0xFF7A6AAF)
+                        : const Color(0xFF8A7AAF),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ProgressLegend extends StatelessWidget {
-  const _ProgressLegend({required this.color, required this.label});
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
+class _NebulaStatCard extends StatelessWidget {
+  const _NebulaStatCard({
     required this.label,
     required this.value,
-    required this.color,
+    required this.primaryColor,
     required this.icon,
-    required this.bgColor,
+    required this.isDark,
   });
 
   final String label;
   final int value;
-  final Color color;
+  final Color primaryColor;
   final IconData icon;
-  final Color bgColor;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
         decoration: BoxDecoration(
-          color: bgColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
+          color: isDark
+              ? const Color(0xFF160F2E).withOpacity(0.9)
+              : Colors.white.withOpacity(0.8),
+          border: Border.all(
+            color: primaryColor.withOpacity(isDark ? 0.3 : 0.2),
+          ),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 24),
+            Icon(icon, color: primaryColor, size: 22),
             const SizedBox(height: 6),
             Text(
               '$value',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              style: TextStyle(
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: color,
+                color: primaryColor,
               ),
             ),
             Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: color.withOpacity(0.8),
+              style: TextStyle(
+                fontSize: 12,
+                color: primaryColor.withOpacity(0.8),
               ),
             ),
           ],
@@ -423,20 +471,22 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _QuickAccessCard extends StatelessWidget {
-  const _QuickAccessCard({
+class _NebulaQuickCard extends StatelessWidget {
+  const _NebulaQuickCard({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.gradient,
+    required this.colors,
     required this.onTap,
+    required this.isDark,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final Gradient gradient;
+  final List<Color> colors;
   final VoidCallback onTap;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -448,22 +498,15 @@ class _QuickAccessCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            gradient: gradient,
+            gradient: LinearGradient(colors: colors),
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: Colors.white, size: 22),
@@ -485,7 +528,7 @@ class _QuickAccessCard extends StatelessWidget {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withOpacity(0.8),
                         fontSize: 12,
                       ),
                     ),

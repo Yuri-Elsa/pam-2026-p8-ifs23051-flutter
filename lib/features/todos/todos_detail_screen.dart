@@ -40,14 +40,12 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
-        maxWidth: 1024,
+        source: ImageSource.gallery, imageQuality: 80, maxWidth: 1024,
       );
       if (picked == null || !mounted) return;
 
       final bytes = await picked.readAsBytes();
-      final token    = context.read<AuthProvider>().authToken ?? '';
+      final token = context.read<AuthProvider>().authToken ?? '';
       final provider = context.read<TodoProvider>();
 
       final success = await provider.updateCover(
@@ -75,22 +73,51 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
   }
 
   Future<void> _confirmDelete(BuildContext ctx) async {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
     final confirmed = await showDialog<bool>(
       context: ctx,
       builder: (d) => AlertDialog(
-        title: const Text('Hapus Todo'),
-        content: const Text('Apakah kamu yakin ingin menghapus todo ini?'),
+        backgroundColor: isDark ? const Color(0xFF160F2E) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Hapus Todo',
+          style: TextStyle(
+            color: isDark ? const Color(0xFFE8E0FF) : const Color(0xFF1A1035),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Apakah kamu yakin ingin menghapus todo ini dari galaksimu?',
+          style: TextStyle(
+            color: isDark
+                ? const Color(0xFFB09FD8)
+                : const Color(0xFF5A4A7A),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(d).pop(false),
-            child: const Text('Batal'),
+            child: Text(
+              'Batal',
+              style: TextStyle(
+                color: isDark
+                    ? const Color(0xFF9D6FFF)
+                    : const Color(0xFF6C3DE1),
+              ),
+            ),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(ctx).colorScheme.error),
-            onPressed: () => Navigator.of(d).pop(true),
-            child: const Text('Hapus'),
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF831843), Color(0xFFDB2777)],
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: TextButton(
+              onPressed: () => Navigator.of(d).pop(true),
+              child:
+              const Text('Hapus', style: TextStyle(color: Colors.white)),
+            ),
           ),
         ],
       ),
@@ -111,8 +138,8 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider    = context.watch<TodoProvider>();
-    final colorScheme = Theme.of(context).colorScheme;
+    final provider = context.watch<TodoProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (provider.status == TodoStatus.loading ||
         provider.status == TodoStatus.initial) {
@@ -127,7 +154,8 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
 
     final todo = provider.selectedTodo;
     if (todo == null) {
-      return const Scaffold(body: Center(child: Text('Data tidak ditemukan.')));
+      return const Scaffold(
+          body: Center(child: Text('Data tidak ditemukan.')));
     }
 
     return Scaffold(
@@ -162,7 +190,19 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
               onTap: _pickCover,
               child: Container(
                 height: 220,
-                color: colorScheme.primaryContainer.withOpacity(0.4),
+                decoration: BoxDecoration(
+                  gradient: isDark
+                      ? const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1A0B3B), Color(0xFF2D1B69)],
+                  )
+                      : const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFEFEBFF), Color(0xFFE0D8FF)],
+                  ),
+                ),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -171,27 +211,28 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
                         todo.urlCover!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => const Center(
-                          child: Icon(Icons.image_not_supported_outlined, size: 48),
+                          child: Icon(Icons.image_not_supported_outlined,
+                              size: 48, color: Color(0xFF9D6FFF)),
                         ),
                       )
                     else
                       Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.add_photo_alternate_outlined,
-                              size: 52, color: colorScheme.primary.withOpacity(0.5)),
+                          const Icon(Icons.add_photo_alternate_outlined,
+                              size: 52, color: Color(0xFF9D6FFF)),
                           const SizedBox(height: 10),
                           Text(
                             'Ketuk untuk menambah cover',
                             style: TextStyle(
-                              color: colorScheme.onSurfaceVariant,
+                              color: isDark
+                                  ? const Color(0xFF7A6AAF)
+                                  : const Color(0xFF8A7AAF),
                               fontSize: 13,
                             ),
                           ),
                         ],
                       ),
-
-                    // Edit overlay
                     if (todo.urlCover != null)
                       Positioned(
                         bottom: 12,
@@ -200,7 +241,12 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF6C3DE1),
+                                Color(0xFF9D174D)
+                              ],
+                            ),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Row(
@@ -226,70 +272,64 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Title ──
                   Text(
                     todo.title,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    style: TextStyle(
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                       decoration: todo.isDone ? TextDecoration.lineThrough : null,
+                      color: isDark
+                          ? const Color(0xFFE8E0FF)
+                          : const Color(0xFF1A1035),
                     ),
                   ),
                   const SizedBox(height: 12),
 
-                  // ── Status Badge ──
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: todo.isDone
-                              ? const Color(0xFF4CAF50).withOpacity(0.12)
-                              : const Color(0xFFFF9800).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: todo.isDone
-                                ? const Color(0xFF4CAF50).withOpacity(0.4)
-                                : const Color(0xFFFF9800).withOpacity(0.4),
+                  // Status badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: todo.isDone
+                            ? [const Color(0xFF0C4A6E), const Color(0xFF0D9488)]
+                            : [const Color(0xFF831843), const Color(0xFFDB2777)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          todo.isDone
+                              ? Icons.check_circle_rounded
+                              : Icons.pending_rounded,
+                          size: 15,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          todo.isDone ? 'Selesai' : 'Belum Selesai',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              todo.isDone
-                                  ? Icons.check_circle_rounded
-                                  : Icons.pending_rounded,
-                              size: 16,
-                              color: todo.isDone
-                                  ? const Color(0xFF4CAF50)
-                                  : const Color(0xFFFF9800),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              todo.isDone ? 'Selesai' : 'Belum Selesai',
-                              style: TextStyle(
-                                color: todo.isDone
-                                    ? const Color(0xFF4CAF50)
-                                    : const Color(0xFFFF9800),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Description ──
                   Text(
                     'Deskripsi',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 13,
                       letterSpacing: 0.5,
+                      color: isDark
+                          ? const Color(0xFF9D6FFF)
+                          : const Color(0xFF6C3DE1),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -297,16 +337,27 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(16),
+                      color: isDark
+                          ? const Color(0xFF1A1535).withOpacity(0.8)
+                          : const Color(0xFFF0EEFF).withOpacity(0.8),
+                      border: Border.all(
+                        color: const Color(0xFF6C3DE1).withOpacity(0.15),
+                      ),
                     ),
                     child: Text(
-                      todo.description.isEmpty ? 'Tidak ada deskripsi.' : todo.description,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      todo.description.isEmpty
+                          ? 'Tidak ada deskripsi.'
+                          : todo.description,
+                      style: TextStyle(
                         height: 1.6,
                         color: todo.description.isEmpty
-                            ? colorScheme.onSurfaceVariant
-                            : colorScheme.onSurface,
+                            ? (isDark
+                            ? const Color(0xFF5A4A7A)
+                            : const Color(0xFF8A7AAF))
+                            : (isDark
+                            ? const Color(0xFFE8E0FF)
+                            : const Color(0xFF1A1035)),
                         fontStyle: todo.description.isEmpty
                             ? FontStyle.italic
                             : FontStyle.normal,
@@ -315,34 +366,52 @@ class _TodosDetailScreenState extends State<TodosDetailScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // ── Toggle Done Button ──
+                  // Toggle done button
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () async {
-                        final token = context.read<AuthProvider>().authToken ?? '';
-                        await context.read<TodoProvider>().editTodo(
-                          authToken:   token,
-                          todoId:      todo.id,
-                          title:       todo.title,
-                          description: todo.description,
-                          isDone:      !todo.isDone,
-                        );
-                      },
-                      icon: Icon(
-                        todo.isDone
-                            ? Icons.radio_button_unchecked_rounded
-                            : Icons.check_circle_outline_rounded,
+                    height: 52,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: todo.isDone
+                              ? [const Color(0xFF831843), const Color(0xFFDB2777)]
+                              : [const Color(0xFF065F46), const Color(0xFF0D9488)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      label: Text(
-                        todo.isDone ? 'Tandai Belum Selesai' : 'Tandai Selesai',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                      ),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        backgroundColor: todo.isDone
-                            ? const Color(0xFFFF9800)
-                            : const Color(0xFF4CAF50),
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: () async {
+                          final token =
+                              context.read<AuthProvider>().authToken ?? '';
+                          await context.read<TodoProvider>().editTodo(
+                            authToken:   token,
+                            todoId:      todo.id,
+                            title:       todo.title,
+                            description: todo.description,
+                            isDone:      !todo.isDone,
+                          );
+                        },
+                        icon: Icon(
+                          todo.isDone
+                              ? Icons.radio_button_unchecked_rounded
+                              : Icons.check_circle_outline_rounded,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          todo.isDone
+                              ? 'Tandai Belum Selesai'
+                              : 'Tandai Selesai',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ),
                   ),
